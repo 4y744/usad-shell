@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>USAD Shell</title>
+  </head>
+  <body>
+    <script>
+      window.top.postMessage({message: "sandbox/connection-established", timestamp: Date.now()}, "*")
+      
+      const validateBase64String = (str) => {
+        try{
+          return atob(str);
+        }
+        catch{
+          return "postMessage('sandbox/invalid-algorithm')"
+        }
+      }
+
+      window.addEventListener("message", (event) => {
+
+        let messageSent = false;
+
+        const variables = event.data.input.map(instance => {
+            return instance.variable;
+        }).join(", ");
+
+        let content;
+        let algUrl;
+
+        if(event.data.type == "box")
+        {
+          content = event.data.input.map(instance => instance.content)
+
+          algUrl = (URL.createObjectURL(new Blob([`
+          const run = (${variables}) => {${validateBase64String(event.data.func)}};
+          self.onmessage = (event) => run(...event.data)`], {type: 'application/javascript'})));
+        }
+        else{
+
+          content = event.data.input[0].content.split(",");
+
+          algUrl = (URL.createObjectURL(new Blob([`
+          const run = (${variables}) => {${validateBase64String(event.data.func)}};
+          self.onmessage = (event) => run(event.data)`], {type: 'application/javascript'})));
+        }
+    
+        const worker = new Worker(algUrl);
+
+        worker.postMessage(content);
+        worker.onmessage = (event) => { 
+          messageSent = true;
+          window.top.postMessage({value: event.data, timestamp: Date.now()}, "*");
+        } 
+
+        setTimeout(() => {
+          if(!messageSent){
+            window.top.postMessage({message: "sandbox/out-of-time", timestamp: Date.now()}, "*")
+          }
+          worker.terminate();
+        }, 3000)
+
+      })     
+    </script>
+  </body>
+</html>
