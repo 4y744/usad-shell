@@ -7,61 +7,66 @@
   </head>
   <body>
     <script>
-      window.top.postMessage({message: "sandbox/connection-established", timestamp: Date.now()}, "*")
-      
-      const validateBase64String = (str) => {
-        try{
-          return atob(str);
-        }
-        catch{
-          return "postMessage('sandbox/invalid-algorithm')"
-        }
-      }
+		window.top.postMessage({message: "sandbox/connection-established", timestamp: Date.now()}, "*")
+		
+		const validateBase64String = (str) => {
+			try{
+				return atob(str);
+			}
+			catch{
+				return "postMessage('sandbox/invalid-algorithm')"
+			}
+		}
 
-      window.addEventListener("message", (event) => {
+		window.addEventListener("message", (event) => {
 
-        let messageSent = false;
+			let messageSent = false;
 
-        const variables = event.data.input.map(instance => {
-            return instance.variable;
-        }).join(", ");
+			try{
+				const variables = event.data.input.map(instance => {
+					return instance.variable;
+				}).join(", ");
 
-        let content;
-        let algUrl;
+				let content;
+				let algUrl;
 
-        if(event.data.type == "box")
-        {
-          content = event.data.input.map(instance => instance.content)
+				if(event.data.type == "multiple")
+				{
+					content = event.data.input.map(instance => instance.content)
 
-          algUrl = (URL.createObjectURL(new Blob([`
-          const run = (${variables}) => {${validateBase64String(event.data.func)}};
-          self.onmessage = (event) => run(...event.data)`], {type: 'application/javascript'})));
-        }
-        else{
+					algUrl = (URL.createObjectURL(new Blob([`
+					const run = (${variables}) => {${validateBase64String(event.data.func)}};
+					self.onmessage = (event) => run(...event.data)`], {type: 'application/javascript'})));
+				}
+				else{
 
-          content = event.data.input[0].content.split(",");
+					content = event.data.input[0].content.split(",");
 
-          algUrl = (URL.createObjectURL(new Blob([`
-          const run = (${variables}) => {${validateBase64String(event.data.func)}};
-          self.onmessage = (event) => run(event.data)`], {type: 'application/javascript'})));
-        }
-    
-        const worker = new Worker(algUrl);
+					algUrl = (URL.createObjectURL(new Blob([`
+					const run = (${variables}) => {${validateBase64String(event.data.func)}};
+					self.onmessage = (event) => run(event.data)`], {type: 'application/javascript'})));
+				}
+			
+				const worker = new Worker(algUrl);
 
-        worker.postMessage(content);
-        worker.onmessage = (event) => { 
-          messageSent = true;
-          window.top.postMessage({value: event.data, timestamp: Date.now()}, "*");
-        } 
+				worker.postMessage(content);
+				worker.onmessage = (event) => { 
+					messageSent = true;
+					window.top.postMessage({message: event.data, timestamp: Date.now()}, "*");
+				} 
 
-        setTimeout(() => {
-          if(!messageSent){
-            window.top.postMessage({message: "sandbox/out-of-time", timestamp: Date.now()}, "*")
-          }
-          worker.terminate();
-        }, 3000)
+				setTimeout(() => {
+					if(!messageSent){
+						window.top.postMessage({message: "sandbox/out-of-time", timestamp: Date.now()}, "*")
+					}
+					worker.terminate();
+				}, 3000)
+			}
+			catch{
+				window.top.postMessage({message: "sandbox/error", timestamp: Date.now()}, "*")
+			}
 
-      })     
+		})     
     </script>
   </body>
 </html>
